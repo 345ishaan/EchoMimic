@@ -19,7 +19,8 @@ import cv2
 import numpy as np
 import torch
 import uuid
-from typing import List, Dict, Optional
+import json
+from typing import List, Dict, Optional, Any
 from diffusers import AutoencoderKL, DDIMScheduler
 from omegaconf import OmegaConf
 from PIL import Image
@@ -68,6 +69,7 @@ def parse_args():
     parser.add_argument("--sample_rate", type=int, default=16000)
     parser.add_argument("--fps", type=int, default=24)
     parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--cache_dir", type=str, default="./cache")
 
     args = parser.parse_args()
 
@@ -87,6 +89,34 @@ def select_face(det_bboxes, probs):
 
     sorted_bboxes = sorted(filtered_bboxes, key=lambda x:(x[3]-x[1]) * (x[2] - x[0]), reverse=True)
     return sorted_bboxes[0]
+
+def get_bbox_from_cache(image_url: str, cache_dir: str, fname="bbox.json"):
+    if not os.path.exists(os.path.join(cache_dir, fname)):
+        return None
+    fp = open(os.path.join(cache_dir, fname))
+    try:
+        data = json.loads(fp.read())
+    except Exception as e:
+        print(e)
+        return None
+    if image_url in data:
+        return data[image_url]
+    return None
+
+def write_bbox_to_cache(image_url: str, cache_dir: str, bbox: List[Any], fname="bbox.json"):
+    fname = os.path.join(cache_dir, fname)
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
+    data = {}
+    data[image_url] = bbox
+    if not os.path.exists(fname):
+        fp = open(fname, 'w')
+        json.dump(data, fp)
+    else:
+        cur_data = open(fname).read()
+        if cur_data:
+            data.update(json.loads(cur_data))
+        json.dump(data, open(fname, 'w'))
 
 
 
@@ -212,18 +242,26 @@ def infer(image_urls: List[str], audio_urls: List[str], save_dir: str):
 
         final_fps = args.fps
 
-        #### face musk prepare
+        #### face mask prepare
+
+        # check if the url is present in the cache.
+
         face_mask = np.zeros((face_img.shape[0], face_img.shape[1])).astype('uint8')
 
-        det_bboxes, probs = face_detector.detect(face_img)
-        if det_bboxes is None or probs is None:
-            det_bboxes, probs = face_detector.detect(face_img[:,:,::-1])
-        select_bbox = select_face(det_bboxes, probs)
+        select_bbox = get_bbox_from_cache(img_url, args.cache_dir)
+        if select_bbox is None:
+            det_bboxes, probs = face_detector.detect(face_img)
+            if det_bboxes is None or probs is None:
+                det_bboxes, probs = face_detector.detect(face_img[:,:,::-1])
+            select_bbox = select_face(det_bboxes, probs)
+
         if select_bbox is None:
             face_mask[:, :] = 255
         else:
             xyxy = select_bbox[:4]
             xyxy = np.round(xyxy).astype('int')
+            # write to cache.
+            write_bbox_to_cache(img_url, args.cache_dir, xyxy.tolist())
             rb, re, cb, ce = xyxy[1], xyxy[3], xyxy[0], xyxy[2]
             r_pad = int((re - rb) * args.facemusk_dilation_ratio)
             c_pad = int((ce - cb) * args.facemusk_dilation_ratio)
