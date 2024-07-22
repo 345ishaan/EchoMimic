@@ -73,7 +73,7 @@ def parse_args():
     parser.add_argument("--cfg", type=float, default=2.5)
     parser.add_argument("--steps", type=int, default=30)
     parser.add_argument("--sample_rate", type=int, default=16000)
-    parser.add_argument("--fps", type=int, default=24)
+    parser.add_argument("--fps", type=int, default=15)
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--cache_dir", type=str, default="./cache")
 
@@ -296,7 +296,7 @@ class GenimeLipSync:
                 self.args.W,
                 self.args.H,
                 self.args.L,#video length
-                20,#args.steps, # inference steps
+                10,#args.steps, # inference steps
                 2.5,#args.cfg, # guidance scale
                 generator=generator,
                 audio_sample_rate=self.args.sample_rate,
