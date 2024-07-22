@@ -12,6 +12,7 @@ import requests
 import random
 import platform
 import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -22,6 +23,9 @@ import uuid
 import json
 from typing import List, Dict, Optional, Any
 from diffusers import AutoencoderKL, DDIMScheduler
+from diffusers.utils import is_accelerate_available
+from xformers.ops import MemoryEfficientAttentionFlashAttentionOp
+
 from omegaconf import OmegaConf
 from PIL import Image
 
@@ -33,6 +37,8 @@ from src.utils.util import save_videos_grid, crop_and_pad
 from src.models.face_locator import FaceLocator
 from moviepy.editor import VideoFileClip, AudioFileClip
 from facenet_pytorch import MTCNN
+
+assert is_accelerate_available(), "accelarate not available"
 
 ffmpeg_path = os.getenv('FFMPEG_PATH')
 if ffmpeg_path is None and platform.system() in ['Linux', 'Darwin']:
@@ -209,6 +215,8 @@ def infer(image_urls: List[str], audio_urls: List[str], save_dir: str):
         scheduler=scheduler,
     )
     pipe = pipe.to("cuda", dtype=weight_dtype)
+    pipe.enable_xformers_memory_efficient_attention(attention_op=MemoryEfficientAttentionFlashAttentionOp)
+    pipe.vae.enable_xformers_memory_efficient_attention(attention_op=None)
 
     date_str = datetime.now().strftime("%Y%m%d")
     time_str = datetime.now().strftime("%H%M")
@@ -279,22 +287,28 @@ def infer(image_urls: List[str], audio_urls: List[str], save_dir: str):
 
         ref_image_pil = Image.fromarray(face_img[:, :, [2, 1, 0]])
         face_mask_tensor = torch.Tensor(face_mask).to(dtype=weight_dtype, device="cuda").unsqueeze(0).unsqueeze(0).unsqueeze(0) / 255.0
-        #pdb.set_trace()
+        
+        stime = time.time()
+
         video = pipe(
             ref_image_pil,
             audio_path,
             face_mask_tensor,
             width,
             height,
-            args.L,
-            args.steps,
-            args.cfg,
+            args.L,#video length
+            20,#args.steps, # inference steps
+            2.5,#args.cfg, # guidance scale
             generator=generator,
             audio_sample_rate=args.sample_rate,
             context_frames=args.context_frames,
             fps=final_fps,
             context_overlap=args.context_overlap
         ).videos
+
+        print("Done running pipeline inference in {}".format(time.time() - stime))
+
+        stime = time.time()
         video_fname = os.path.join(save_dir, f"video_{idx}.mp4")
         video_w_audio_fname = os.path.join(save_dir, f"video_audio_{idx}.mp4")
         video = video
@@ -310,6 +324,7 @@ def infer(image_urls: List[str], audio_urls: List[str], save_dir: str):
         video_clip = video_clip.set_audio(audio_clip)
         video_clip.write_videofile(video_w_audio_fname,
                 codec="libx264", audio_codec="aac")
+        print("Done Video Processing took: {}".format(time.time()-stime))
         save_video_fnames.append(video_w_audio_fname)
     concat_file = os.path.join(save_dir, 'concat_list.txt')
     final_concat_fname = os.path.join(save_dir, 'final_concat.mp4')
@@ -322,7 +337,7 @@ def infer(image_urls: List[str], audio_urls: List[str], save_dir: str):
 if __name__ == "__main__":
     img_urls = [
         "https://ttvaarlnqssopdguetwq.supabase.co/storage/v1/object/sign/genime-bucket/character_sam.webp?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJnZW5pbWUtYnVja2V0L2NoYXJhY3Rlcl9zYW0ud2VicCIsImlhdCI6MTcyMTQ3MDgzNSwiZXhwIjoxNzUzMDA2ODM1fQ.GXTUB7iYGkrEQIDJahtkdLFyInyetHgfSv5hgHPtvSk&t=2024-07-20T10%3A20%3A35.248Z",
-        "https://ttvaarlnqssopdguetwq.supabase.co/storage/v1/object/sign/genime-bucket/character_sandy.webp?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJnZW5pbWUtYnVja2V0L2NoYXJhY3Rlcl9zYW5keS53ZWJwIiwiaWF0IjoxNzIxNDcyMDc5LCJleHAiOjE3NTMwMDgwNzl9.OnOoigkl4CJj8wsdZIDokwsRL4YK84o6o-O6A2plhYM&t=2024-07-20T10%3A41%3A18.610Z"
+        "https://ttvaarlnqssopdguetwq.supabase.co/storage/v1/object/sign/genime-bucket/character_sam.webp?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJnZW5pbWUtYnVja2V0L2NoYXJhY3Rlcl9zYW0ud2VicCIsImlhdCI6MTcyMTQ3MDgzNSwiZXhwIjoxNzUzMDA2ODM1fQ.GXTUB7iYGkrEQIDJahtkdLFyInyetHgfSv5hgHPtvSk&t=2024-07-20T10%3A20%3A35.248Z"
     ]
     audio_urls = [
         "https://ttvaarlnqssopdguetwq.supabase.co/storage/v1/object/sign/genime-bucket/170.wav?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJnZW5pbWUtYnVja2V0LzE3MC53YXYiLCJpYXQiOjE3MjE0OTk3OTQsImV4cCI6MTc1MzAzNTc5NH0.Eb6UZMRhlQc_dn308U-2Qnqq-PJAcxfFq-qqE4lVsWg&t=2024-07-20T18%3A23%3A14.638Z",
