@@ -24,6 +24,8 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 supa_client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+genime_lipsync = genime_inference.GenimeLipSync()
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -59,7 +61,7 @@ async def create_lipsync(lipsyncReq: LipSyncRequest):
     """
 
     save_dir = f"/home/EchoMimic/{str(uuid.uuid4())}"
-    genime_inference.infer(image_urls=[
+    genime_lipsync.infer(image_urls=[
         req.video_url for req in lipsyncReq.reqs],
         audio_urls=[
         req.audio_url for req in lipsyncReq.reqs],
@@ -77,4 +79,4 @@ async def create_lipsync(lipsyncReq: LipSyncRequest):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8081)
