@@ -1,5 +1,5 @@
-torch>=2.0.1,<=2.2.2
-torchvision>=0.15.2,<=0.17.2
+torch==2.3.1
+torchvision==0.18.1
 torchaudio>=2.0.2,<=2.2.2
 mediapipe
 transformers>=4.38.2
@@ -15,3 +15,6 @@ omegaconf==2.3.0
 opencv-python
 av==11.0.0
 gradio
+accelerate==0.32.1
+xformers==0.0.27
+supabase==2.5.1

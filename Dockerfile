@@ -6,7 +6,7 @@ ENV TZ=America/New_York
 
 # Install tzdata and other packages
 RUN apt-get update && \
-    apt-get install -y tzdata git git-lfs && \
+    apt-get install -y tzdata git git-lfs libgl1-mesa-glx vim && \
     ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && \
     dpkg-reconfigure --frontend noninteractive tzdata
 
@@ -23,3 +23,5 @@ RUN pip install -r requirements.txt
 
 RUN apt-get install -y wget && wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz && tar -xvf ffmpeg-release-amd64-static.tar.xz
 ENV FFMPEG_PATH=/EchoMimic/ffmpeg-7.0.1-amd64-static
+
+WORKDIR /EchoMimic
