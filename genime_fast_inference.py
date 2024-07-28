@@ -32,7 +32,7 @@ from PIL import Image
 from src.models.unet_2d_condition import UNet2DConditionModel
 from src.models.unet_3d_echo import EchoUNet3DConditionModel
 from src.models.whisper.audio2feature import load_audio_model
-from src.pipelines.pipeline_echo_mimic import Audio2VideoPipeline
+from src.pipelines.pipeline_echo_mimic_acc import Audio2VideoPipeline
 from src.utils.util import save_videos_grid, crop_and_pad
 from src.models.face_locator import FaceLocator
 from moviepy.editor import VideoFileClip, AudioFileClip
@@ -59,7 +59,7 @@ if ffmpeg_path is not None and ffmpeg_path not in os.getenv('PATH'):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="./configs/prompts/animation.yaml")
+    parser.add_argument("--config", type=str, default="./configs/prompts/animation_acc.yaml")
     parser.add_argument("-W", type=int, default=512)
     parser.add_argument("-H", type=int, default=512)
     parser.add_argument("-L", type=int, default=1200)
@@ -70,10 +70,10 @@ def parse_args():
     parser.add_argument("--context_frames", type=int, default=12)
     parser.add_argument("--context_overlap", type=int, default=3)
 
-    parser.add_argument("--cfg", type=float, default=2.5)
-    parser.add_argument("--steps", type=int, default=30)
+    parser.add_argument("--cfg", type=float, default=1.0)
+    parser.add_argument("--steps", type=int, default=6)
     parser.add_argument("--sample_rate", type=int, default=16000)
-    parser.add_argument("--fps", type=int, default=15)
+    parser.add_argument("--fps", type=int, default=24)
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--cache_dir", type=str, default="./cache")
 
@@ -296,8 +296,8 @@ class GenimeLipSync:
                 self.args.W,
                 self.args.H,
                 self.args.L,#video length
-                10,#args.steps, # inference steps
-                2.5,#args.cfg, # guidance scale
+                self.args.steps, # inference steps
+                self.args.cfg, # guidance scale
                 generator=generator,
                 audio_sample_rate=self.args.sample_rate,
                 context_frames=self.args.context_frames,
@@ -344,5 +344,5 @@ if __name__ == "__main__":
         "https://ttvaarlnqssopdguetwq.supabase.co/storage/v1/object/sign/genime-bucket/170.wav?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJnZW5pbWUtYnVja2V0LzE3MC53YXYiLCJpYXQiOjE3MjE0OTk3OTQsImV4cCI6MTc1MzAzNTc5NH0.Eb6UZMRhlQc_dn308U-2Qnqq-PJAcxfFq-qqE4lVsWg&t=2024-07-20T18%3A23%3A14.638Z",
         "https://ttvaarlnqssopdguetwq.supabase.co/storage/v1/object/sign/genime-bucket/169.wav?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJnZW5pbWUtYnVja2V0LzE2OS53YXYiLCJpYXQiOjE3MjE0OTk5NzEsImV4cCI6MTc1MzAzNTk3MX0.PbIuOPDorH-0z7yvAMjk_kexeFeHNPxKo-D8JG-rfr4&t=2024-07-20T18%3A26%3A11.485Z"
     ]
-    save_dir = "/home/EchoMimic/genime_results"
+    save_dir = "/home/EchoMimic/genime_fast_results"
     lipsync.infer(img_urls, audio_urls, save_dir)
